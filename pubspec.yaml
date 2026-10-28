@@ -1,0 +1,38 @@
+name: voicedebt
+description: "100% free, offline, voice-first debt and borrowing tracker built with Flutter and SQLite."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Native Android offline speech recognition (100% free, no API keys)
+  speech_to_text: ^7.0.0
+
+  # Local SQLite database (100% free, embedded on device)
+  sqflite: ^2.4.1
+  path: ^1.9.0
+
+  # Clean reactive state management
+  provider: ^6.1.2
+
+  # Android App Shortcuts for home screen & hardware gesture launch
+  quick_actions: ^1.0.7
+
+  # Date/time and currency formatting
+  intl: ^0.19.0
+
+  # Material icons
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
