@@ -20,53 +20,28 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 1. Clean and regenerate modern Android scaffolding
-      - name: Recreate Clean Android Scaffold
+      - name: Recreate Clean Android Scaffold (Fix v1 embedding)
         run: |
+          # Remove incomplete skeleton android directory
           rm -rf android
+          # Generate clean modern v2 embedding Android project
           flutter create --org com.voicedebt --project-name voicedebt --platforms=android .
 
-      # 2. Inject microphone permissions into AndroidManifest.xml
       - name: Inject Microphone Permissions & Speech Queries
         run: |
           python3 -c "
           with open('android/app/src/main/AndroidManifest.xml', 'r') as f:
               c = f.read()
-          perms = '''    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />
+          perms = '''    <uses-permission android:name="android.permission.RECORD_AUDIO" />
               <queries>
                   <intent>
-                      <action android:name=\"android.speech.RecognitionService\" />
+                      <action android:name="android.speech.RecognitionService" />
                   </intent>
               </queries>
           '''
           c = c.replace('<application', perms + '    <application')
           with open('android/app/src/main/AndroidManifest.xml', 'w') as f:
               f.write(c)
-          "
-
-      # 3. Patch CardThemeData and dollar sign escapes in lib/main.dart
-      - name: Patch Dart Syntax
-        run: |
-          python3 -c "
-          with open('lib/main.dart', 'r') as f:
-              code = f.read()
-
-          # Fix CardTheme to CardThemeData
-          code = code.replace('cardTheme: CardTheme(', 'cardTheme: CardThemeData(')
-
-          # Fix NumberFormat symbol to raw string r'$'
-          code = code.replace(\"symbol: '\$'\", \"symbol: r'\$'\")
-
-          # Fix labelText Amount ($)
-          code = code.replace(\"labelText: 'Amount (\$)'\", \"labelText: r'Amount (\$)'\")
-
-          # Fix unescaped literal dollar signs before variables
-          code = code.replace('• \$\$', '• \\\$')
-          code = code.replace(': \$\$', ': \\\$')
-          code = code.replace('Remove \$\$', 'Remove \\\$')
-
-          with open('lib/main.dart', 'w') as f:
-              f.write(code)
           "
 
       - name: Install Dependencies

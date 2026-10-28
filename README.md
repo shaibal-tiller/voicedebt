@@ -1,18 +1,118 @@
-# Complete Step-by-Step Guide: Compiling VoiceDebt into an Android APK
+# Complete Step-by-Step Guide: Compiling VoiceDebt into an Android APK on macOS
 
-Follow this foolproof, step-by-step guide to compile the VoiceDebt app into a production-ready, standalone, 100% offline APK for your Android phone.
+## ⚡ Mac Fast-Track: 1-Minute Automated Terminal Setup
+If you downloaded `voicedebt_flutter_offline_app.zip` into your Mac's **Downloads** folder, open your Mac **Terminal** (press `Cmd + Space`, type `Terminal`, and hit Enter), then copy & paste this single command block:
+
+```bash
+# 1. Go to Downloads and extract the downloaded zip
+cd ~/Downloads
+unzip -o voicedebt_flutter_offline_app.zip -d voicedebt_extracted
+
+# 2. Create the full Flutter Android project scaffolding
+flutter create --org com.voicedebt voicedebt_app
+cd voicedebt_app
+
+# 3. Copy the VoiceDebt code and permissions into the project
+cp ~/Downloads/voicedebt_extracted/pubspec.yaml ./pubspec.yaml
+cp ~/Downloads/voicedebt_extracted/lib/main.dart ./lib/main.dart
+cp ~/Downloads/voicedebt_extracted/android/app/src/main/AndroidManifest.xml ./android/app/src/main/AndroidManifest.xml
+
+# 4. Fetch packages and build your release APK
+flutter pub get
+flutter build apk --release
+
+# 5. Open the folder containing your finished APK in Finder
+open build/app/outputs/flutter-apk/
+```
 
 ---
 
-## 🛠️ Step 1: Prerequisites
-Ensure you have the following installed on your computer:
-1. **Flutter SDK** (Version 3.2.0 or higher):
-   - Check via: `flutter doctor`
-   - Download from [flutter.dev](https://docs.flutter.dev/get-started/install)
-2. **Android Studio** (or Android Command Line Tools):
-   - Android SDK Tools, Android SDK Platform-Tools, and Android SDK Build-Tools (API 34 recommended)
-   - Java Development Kit (JDK 17 recommended)
-3. An Android phone with **USB Debugging** enabled or an Android Emulator.
+## 🛠️ Prerequisites Checklist on Mac
+Before running the build command, make sure Flutter and Android tools are installed:
+1. **Check if Flutter is installed**:
+   ```bash
+   flutter --version
+   ```
+   - If not installed, run with Homebrew: `brew install --cask flutter`
+   - Or download Flutter SDK directly from [flutter.dev](https://docs.flutter.dev/get-started/install/macos).
+2. **Check Android environment**:
+   ```bash
+   flutter doctor
+   ```
+   - If prompted for Android licenses:
+     ```bash
+     flutter doctor --android-licenses
+     ```
+     *(Press `y` and Enter to accept all licenses).*
+## ☁️ Free Cloud Build with GitHub Actions (Fixes v1 embedding error)
+The reason you got **"Build failed due to use of deleted Android v1 embedding"** is that your repo contains the partial skeleton `android/app/src/main/AndroidManifest.xml` without the full Gradle project and `MainActivity.kt`. When Flutter ran, it detected the existing `android` directory, skipped creating the missing Kotlin files, and assumed it was legacy v1.
+
+Here is the exact **`build_apk.yml`** that removes the partial directory, creates the clean modern v2 scaffold, and builds the release APK:
+
+Place this file in your repository at:
+```
+.github/workflows/build_apk.yml
+```
+
+```yaml
+name: Build Android APK
+on: [push, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Recreate Clean Android Scaffold (Fix v1 embedding)
+        run: |
+          # Remove incomplete skeleton android directory
+          rm -rf android
+          # Generate clean modern v2 embedding Android project
+          flutter create --org com.voicedebt --project-name voicedebt --platforms=android .
+
+      - name: Inject Microphone Permissions & Speech Queries
+        run: |
+          python3 -c "
+          with open('android/app/src/main/AndroidManifest.xml', 'r') as f:
+              c = f.read()
+          perms = '''    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+              <queries>
+                  <intent>
+                      <action android:name="android.speech.RecognitionService" />
+                  </intent>
+              </queries>
+          '''
+          c = c.replace('<application', perms + '    <application')
+          with open('android/app/src/main/AndroidManifest.xml', 'w') as f:
+              f.write(c)
+          "
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicedebt-app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+```
 
 ---
 
@@ -157,13 +257,41 @@ This produces optimized APKs:
 
 ---
 
-## 🎙️ Step 9: Enable 100% OFFLINE Speech Recognition on Android
-To ensure speech recognition works in the middle of nowhere without internet:
-1. Open your Android phone's **Settings**.
-2. Go to **Google** -> **Settings for Google Apps** -> **Voice** (or **Search, Assistant & Voice**).
-3. Tap **Offline speech recognition**.
-4. In the **All** tab, download your language (e.g. *English (US)* or *English (India)* or *Bengali*).
-5. Voice recognition will now work with 0ms latency and zero data usage!
+## 🎙️ Step 9: Offline Speech Recognition: Why Bangla Isn't in the List & How to Solve It
+
+### The Issue: Why isn't Bangla (বাংলা) in Android's "Offline Speech Recognition" download list?
+Google's system speech engine (**Google Speech Services** on Android) only packages offline downloadable neural models for a select tier of languages (e.g. English, Hindi, Spanish, French, German, Japanese, Chinese). **Google does NOT provide an offline downloadable model for Bengali (`bn_BD` / `bn_IN`)** on standard Android.
+
+---
+
+### Solution 1: Use Banglish with the English Offline Model (100% OFFLINE & 0ms Latency)
+Every single Android phone in the world comes with the **English (US)** or **English (India)** offline speech recognition model pre-installed (or downloadable with 1 tap in Settings).
+
+When VoiceDebt is set to **English / Banglish** mode:
+1. Speak phonetically in **Banglish**:
+   - *"Rahim ke 5000 taka dilam"*
+   - *"Rahim 2000 ferot dilo"*
+   - *"Zaman theke 2000 dhar nilam"*
+   - *"Zaman ke 500 taka ferot dilam"*
+   - *"Tanvir theke 1500 dhar nilam"*
+2. The phone's English offline speech model transcribes these exact Latin phonetic words.
+3. Our offline VoiceDebt parser automatically recognizes the Bengali grammar, auto-corrects misheard sounds (e.g., `delam` -> `dilam`, `pherot` -> `ferot`, `shod` -> `shodh`), detaches suffixes (`Rahimke` -> `Rahim`), and logs the debt with **zero internet connection**!
+
+### Solution 2: Free Online Speech Recognition for Bengali Script (When Wi-Fi or Mobile Data is on)
+When your phone has internet (Wi-Fi or Mobile Data) turned on:
+- Switch the language toggle to **🇧🇩 বাংলা (bn_BD)**.
+- Speak naturally in Bengali:
+  - *"আমি রহিমকে ৫০০০ টাকা দিয়েছি"*
+  - *"রহিম আমাকে ২০০০ টাকা ফেরত দিল"*
+  - *"জামান থেকে ২০০০ ধার নিলাম"*
+- Android transcribes this using Google's live server **100% free with NO paid API keys or subscription fees**!
+
+### Solution 3: Gboard On-Device Voice Typing
+If your phone runs Android 12+ (Google Pixel, Samsung Galaxy S/A series, Xiaomi):
+1. Open **Settings** -> **System** -> **Keyboard** -> **Gboard**.
+2. Tap **Voice typing** -> Enable **Faster voice typing** (On-device speech recognition).
+3. Under **Languages**, add **বাংলা (বাংলাদেশ)**.
+4. When inside any manual text entry field, tap the microphone button on the Gboard keyboard to dictate in Bengali script directly!
 
 ---
 
@@ -181,4 +309,3 @@ You can launch VoiceDebt directly into listening mode with one of the following:
   - Long press the VoiceDebt app icon on your home screen.
   - You will see the **Quick Voice Log** popup shortcut.
   - Drag it directly onto your home screen for instant 1-tap recording!
-# voicedebt
