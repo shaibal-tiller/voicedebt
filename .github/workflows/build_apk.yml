@@ -17,54 +17,37 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.29.0'
           channel: 'stable'
+          cache: true
 
-      # Automatically generates the missing Gradle wrappers and modern v2 MainActivity.kt
-      - name: Scaffold Modern Android v2 Embedding
+      # 1. Remove the incomplete skeleton and regenerate modern v2 embedding
+      - name: Recreate Clean Android Scaffold (Fix v1 embedding)
         run: |
-          flutter create --org com.voicedebt --project-name voicedebt .
+          rm -rf android
+          flutter create --org com.voicedebt --project-name voicedebt --platforms=android .
 
-      # Injects microphone permissions and offline speech queries into AndroidManifest.xml
-      - name: Configure Microphone Permissions & Speech Recognition
+      # 2. Inject audio recording permission & speech queries
+      - name: Inject Microphone Permissions & Speech Queries
         run: |
-          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-permission android:name="android.permission.RECORD_AUDIO" />
-              <uses-permission android:name="android.permission.BLUETOOTH" />
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-
+          python3 -c "
+          with open('android/app/src/main/AndroidManifest.xml', 'r') as f:
+              c = f.read()
+          perms = '''    <uses-permission android:name=\"android.permission.RECORD_AUDIO\" />
               <queries>
                   <intent>
-                      <action android:name="android.speech.RecognitionService" />
+                      <action android:name=\"android.speech.RecognitionService\" />
                   </intent>
               </queries>
+          '''
+          c = c.replace('<application', perms + '    <application')
+          with open('android/app/src/main/AndroidManifest.xml', 'w') as f:
+              f.write(c)
+          "
 
-              <application
-                  android:label="VoiceDebt"
-                  android:name="${applicationName}"
-                  android:icon="@mipmap/ic_launcher">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:launchMode="singleTop"
-                      android:theme="@style/LaunchTheme"
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-                      android:hardwareAccelerated="true"
-                      android:windowSoftInputMode="adjustResize">
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-              </application>
-          </manifest>
-          EOF
-
-      - name: Fetch Dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Standalone Release APK
+      - name: Build Release APK
         run: flutter build apk --release
 
       - name: Upload APK Artifact
