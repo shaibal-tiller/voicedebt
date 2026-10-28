@@ -20,13 +20,13 @@ jobs:
           channel: 'stable'
           cache: true
 
-      # 1. Remove the incomplete skeleton and regenerate modern v2 embedding
-      - name: Recreate Clean Android Scaffold (Fix v1 embedding)
+      # 1. Clean and regenerate modern Android scaffolding
+      - name: Recreate Clean Android Scaffold
         run: |
           rm -rf android
           flutter create --org com.voicedebt --project-name voicedebt --platforms=android .
 
-      # 2. Inject audio recording permission & speech queries
+      # 2. Inject microphone permissions into AndroidManifest.xml
       - name: Inject Microphone Permissions & Speech Queries
         run: |
           python3 -c "
@@ -42,6 +42,31 @@ jobs:
           c = c.replace('<application', perms + '    <application')
           with open('android/app/src/main/AndroidManifest.xml', 'w') as f:
               f.write(c)
+          "
+
+      # 3. Patch CardThemeData and dollar sign escapes in lib/main.dart
+      - name: Patch Dart Syntax
+        run: |
+          python3 -c "
+          with open('lib/main.dart', 'r') as f:
+              code = f.read()
+
+          # Fix CardTheme to CardThemeData
+          code = code.replace('cardTheme: CardTheme(', 'cardTheme: CardThemeData(')
+
+          # Fix NumberFormat symbol to raw string r'$'
+          code = code.replace(\"symbol: '\$'\", \"symbol: r'\$'\")
+
+          # Fix labelText Amount ($)
+          code = code.replace(\"labelText: 'Amount (\$)'\", \"labelText: r'Amount (\$)'\")
+
+          # Fix unescaped literal dollar signs before variables
+          code = code.replace('• \$\$', '• \\\$')
+          code = code.replace(': \$\$', ': \\\$')
+          code = code.replace('Remove \$\$', 'Remove \\\$')
+
+          with open('lib/main.dart', 'w') as f:
+              f.write(code)
           "
 
       - name: Install Dependencies
