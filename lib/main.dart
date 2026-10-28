@@ -1,4 +1,4 @@
-// ============================================================================
+export const MAIN_DART = `// ============================================================================
 // VoiceDebt - 100% Free, Offline, Multilingual Voice-First Debt Tracker
 // Languages: বাংলা (Bangla), Banglish (Phonetic Bengali), and English
 // Framework: Flutter (Dart)
@@ -204,7 +204,7 @@ class VoiceParser {
     'dollars', 'dollar', 'taka', 'tk', 'rupees', 'rs', 'bucks', 'usd', 'eur', 'cash', 'money',
     'just', 'please', 'log', 'record', 'note',
     'ami', 'amake', 'amar', 'tumi', 'apni', 'ke', 'theke', 'te', 'er', 'kase', 'kaase',
-    'taka', 'poisa', 'tk', 'ta', 'k', 'hajar', 'ekta', 'dhoro', 'bhai', 'dada',
+    'poisa', 'ta', 'k', 'hajar', 'ekta', 'dhoro', 'bhai', 'dada',
     'dilam', 'nilam', 'ferot', 'dhar', 'karjo', 'shodh',
     'আমি', 'আমাকে', 'আমার', 'তুমি', 'আপনি', 'কে', 'থেকে', 'তে', 'টাকা', 'পয়সা', 'করে', 'দিয়ে', 'ভাই', 'দা',
     'দিলাম', 'নিলাম', 'দিয়েছি', 'দিয়েছি', 'নিয়েছি', 'নিয়েছি', 'দিছি', 'নিছি',
@@ -229,22 +229,22 @@ class VoiceParser {
     final List<String> corrections = [];
 
     // Separate attached Banglish suffix (e.g. "rahimke" -> "rahim ke")
-    text = text.replaceAllMapped(RegExp(r'([a-zA-Z]{3,})(ke|re|theke|thek|te)', caseSensitive: false), (m) {
-      return '${m[1]} ${m[2]}';
+    text = text.replaceAllMapped(RegExp(r'([a-zA-Z]{3,})(ke|re|theke|thek|te)\b', caseSensitive: false), (m) {
+      return '\${m[1]} \${m[2]}';
     });
 
     // Separate attached Bangla suffix (e.g. "রহিমকে" -> "রহিম ")
     const protectedBn = {'থেকে', 'আমাকে', 'তোমাকে', 'কাকে', 'নিজেদের'};
-    text = text.replaceAllMapped(RegExp(r'([ঀ-৿]{2,})(কে|রে)(?=s|$|[.,!?])'), (m) {
+    text = text.replaceAllMapped(RegExp(r'([\u0980-\u09FF]{2,})(কে|রে)(?=\s|$|[.,!?])'), (m) {
       if (protectedBn.contains(m[0])) return m[0]!;
-      return '${m[1]} ';
+      return '\${m[1]} ';
     });
 
     // Auto-correct misheard words
-    final wordsList = text.split(RegExp(r's+')).map((token) {
-      final clean = token.toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9ঀ-৿]'), '');
+    final wordsList = text.split(RegExp(r'\s+')).map((token) {
+      final clean = token.toLowerCase().replaceAll(RegExp(r'[^a-zA-Z0-9\u0980-\u09FF]'), '');
       if (_autoCorrectMap.containsKey(clean)) {
-        corrections.add('"$token" -> "${_autoCorrectMap[clean]}"');
+        corrections.add('"\$token" -> "\${_autoCorrectMap[clean]}"');
         return _autoCorrectMap[clean]!;
       }
       return token;
@@ -253,10 +253,10 @@ class VoiceParser {
     final cleaned = wordsList.join(' ');
     final lower = cleaned.toLowerCase();
 
-    final bool isBanglaScript = RegExp(r'[ঀ-৿]').hasMatch(raw);
+    final bool isBanglaScript = RegExp(r'[\u0980-\u09FF]').hasMatch(raw);
     final String detectedLang = isBanglaScript
         ? 'Bangla'
-        : (RegExp(r'(dilam|nilam|ferot|shodh|dhar|taka|ke|theke|ami|amake)', caseSensitive: false).hasMatch(lower)
+        : (RegExp(r'\b(dilam|nilam|ferot|shodh|dhar|taka|ke|theke|ami|amake)\b', caseSensitive: false).hasMatch(lower)
             ? 'Banglish'
             : 'English');
 
@@ -264,30 +264,30 @@ class VoiceParser {
 
     // 1. Repayment Made (I repaid)
     if (RegExp(r'(?:ফেরত দিলাম|শোধ দিলাম|শোধ করলাম|পরিশোধ করলাম|পরিশোধ দিলাম)').hasMatch(lower) ||
-        RegExp(r'(is+returned|is+paid|is+gaves+back|gaves+back|paids+backs+to|repaid)').hasMatch(lower) ||
-        RegExp(r'(ferots+dilam|pherots+dilam|shodhs+dilam|shodhs+korlam|sodhs+dilam|sodhs+korlam|porishodhs+korlam|amis+ferots+dilam)').hasMatch(lower)) {
+        RegExp(r'\b(i\s+returned|i\s+paid|i\s+gave\s+back|gave\s+back|paid\s+back\s+to|repaid)\b').hasMatch(lower) ||
+        RegExp(r'\b(ferot\s+dilam|pherot\s+dilam|shodh\s+dilam|shodh\s+korlam|sodh\s+dilam|sodh\s+korlam|porishodh\s+korlam|ami\s+ferot\s+dilam)\b').hasMatch(lower)) {
       detectedType = TransactionType.repayment_made;
     }
     // 2. Repayment Received (They repaid me)
     else if (RegExp(r'(?:ফেরত দিল|ফেরত দিলো|ফেরত পেলাম|ফেরত পাইলাম|ফেরত পাইছি|শোধ দিল|শোধ দিলো)').hasMatch(lower) ||
-        RegExp(r'(returned|paids+back|gots+d+|gots+from|received)').hasMatch(lower) ||
-        RegExp(r'(ferots+dilo|pherots+dilo|ferots+pelam|pherots+pelam|ferots+paisi|ferots+paise)').hasMatch(lower)) {
+        RegExp(r'\b(returned|paid\s+back|got\s+\d+|got\s+from|received)\b').hasMatch(lower) ||
+        RegExp(r'\b(ferot\s+dilo|pherot\s+dilo|ferot\s+pelam|pherot\s+pelam|ferot\s+paisi|ferot\s+paise)\b').hasMatch(lower)) {
       detectedType = TransactionType.repayment_received;
     }
     // 3. Borrow Intent (I took money)
     else if (RegExp(r'(?:ধার নিলাম|ধার নিছি|করজ নিলাম|হাওলাত নিলাম|নিলাম|নিয়েছি|নিছি|ধার নিয়েছি|ধার নিয়েছি)').hasMatch(lower) ||
-        RegExp(r'(borrowed|took)').hasMatch(lower) ||
-        RegExp(r'(dhars+nilam|karjos+nilam|nilam|nichi|niyechi|borrows+korlam|thekes+nilam)').hasMatch(lower)) {
+        RegExp(r'\b(borrowed|took)\b').hasMatch(lower) ||
+        RegExp(r'\b(dhar\s+nilam|karjo\s+nilam|nilam|nichi|niyechi|borrow\s+korlam|theke\s+nilam)\b').hasMatch(lower)) {
       detectedType = TransactionType.borrowed_from;
     }
     // 4. Lend Intent (I gave money)
     else if (RegExp(r'(?:ধার দিলাম|ধার দিছি|করজ দিলাম|হাওলাত দিলাম|দিলাম|দিয়েছি|দিয়েছি|দিছি)').hasMatch(lower) ||
-        RegExp(r'(lent|lend|gave)').hasMatch(lower) ||
-        RegExp(r'(dhars+dilam|dilam|dichi|diyechi|lends+korlam|dhars+dichi)').hasMatch(lower)) {
+        RegExp(r'\b(lent|lend|gave)\b').hasMatch(lower) ||
+        RegExp(r'\b(dhar\s+dilam|dilam|dichi|diyechi|lend\s+korlam|dhar\s+dichi)\b').hasMatch(lower)) {
       detectedType = TransactionType.lent_to;
     }
     // 5. Shorthand "paid"
-    else if (RegExp(r'(paid)').hasMatch(lower)) {
+    else if (RegExp(r'\b(paid)\b').hasMatch(lower)) {
       detectedType = TransactionType.repayment_made;
     }
 
@@ -295,12 +295,12 @@ class VoiceParser {
     double? amount;
     String? matchedToken;
 
-    final kMatch = RegExp(r'(?:^|s|[.,!?])(d+(?:.d+)?)s*(?:k|thousand|হাজার|hajar|hazar)(?=s|$|[.,!?])', caseSensitive: false).firstMatch(lower);
+    final kMatch = RegExp(r'(?:^|\s|[.,!?])(\d+(?:\.\d+)?)\s*(?:k|thousand|হাজার|hajar|hazar)(?=\s|$|[.,!?])', caseSensitive: false).firstMatch(lower);
     if (kMatch != null && kMatch.group(1) != null) {
       amount = double.tryParse(kMatch.group(1)!)! * 1000.0;
       matchedToken = kMatch.group(0);
     } else {
-      final numMatch = RegExp(r'(?:[$€£₹৳]s*|tks*|takas*)?(d+(?:.d+)?|d{1,3}(?:,d{3})+(?:.d+)?)', caseSensitive: false).firstMatch(lower);
+      final numMatch = RegExp(r'(?:[$€£₹৳]\s*|tk\s*|taka\s*)?(\b\d+(?:\.\d+)?\b|\b\d{1,3}(?:,\d{3})+(?:\.\d+)?\b)', caseSensitive: false).firstMatch(lower);
       if (numMatch != null && numMatch.group(1) != null) {
         amount = double.tryParse(numMatch.group(1)!.replaceAll(',', ''));
         matchedToken = numMatch.group(0);
@@ -327,23 +327,23 @@ class VoiceParser {
     ];
 
     for (final p in phrasesToRemove) {
-      if (RegExp(r'[ঀ-৿]').hasMatch(p)) {
+      if (RegExp(r'[\u0980-\u09FF]').hasMatch(p)) {
         remainder = remainder.replaceAll(p, ' ');
       } else {
-        remainder = remainder.replaceAll(RegExp('\b$p\b', caseSensitive: false), ' ');
+        remainder = remainder.replaceAll(RegExp(r'\b' + p + r'\b', caseSensitive: false), ' ');
       }
     }
 
     final tokens = remainder
-        .replaceAll(RegExp(r'[^a-zA-Z0-9ঀ-৿s]'), ' ')
-        .split(RegExp(r's+'))
-        .where((w) => w.isNotEmpty && !_stopWords.contains(w) && !RegExp(r'^d+$').hasMatch(w))
+        .replaceAll(RegExp(r'[^a-zA-Z0-9\u0980-\u09FF\s]'), ' ')
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty && !_stopWords.contains(w) && !RegExp(r'^\d+$').hasMatch(w))
         .toList();
 
     String? personName;
     if (tokens.isNotEmpty) {
       personName = tokens.take(2).map((w) {
-        if (RegExp(r'[ঀ-৿]').hasMatch(w)) return w;
+        if (RegExp(r'[\u0980-\u09FF]').hasMatch(w)) return w;
         return w[0].toUpperCase() + w.substring(1).toLowerCase();
       }).join(' ');
     }
@@ -656,7 +656,7 @@ class AppProvider with ChangeNotifier {
     try {
       _isSpeechAvailable = await _speech.initialize(
         onError: (err) {
-          debugPrint('Speech error: $err');
+          debugPrint('Speech error: \$err');
           _isListening = false;
           if (_selectedLanguage == 'bn_BD') {
             _speechErrorMessage = 'Bengali speech requires internet on this phone. Switch to Offline Banglish ("Rahim ke 5000 dilam")!';
@@ -673,7 +673,7 @@ class AppProvider with ChangeNotifier {
         },
       );
     } catch (e) {
-      debugPrint('Speech init failed: $e');
+      debugPrint('Speech init failed: \$e');
       _isSpeechAvailable = false;
     }
   }
@@ -1081,11 +1081,11 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
                       child: Row(
                         children: [
-                          _buildFilterChip('All (${provider.people.length})', 'all'),
+                          _buildFilterChip('All (\${provider.people.length})', 'all'),
                           const SizedBox(width: 6),
-                          _buildFilterChip('Owes Me (${provider.people.filter((p) => p.netBalance > 0).length})', 'owed'),
+                          _buildFilterChip('Owes Me (\${provider.people.where((p) => p.netBalance > 0).length})', 'owed'),
                           const SizedBox(width: 6),
-                          _buildFilterChip('I Owe (${provider.people.filter((p) => p.netBalance < 0).length})', 'iowe'),
+                          _buildFilterChip('I Owe (\${provider.people.where((p) => p.netBalance < 0).length})', 'iowe'),
                           const SizedBox(width: 6),
                           _buildFilterChip('Settled', 'settled'),
                         ],
@@ -1108,9 +1108,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 40),
                               child: Text(
-                                'Tap mic and say in Bangla or Banglish:
-"আমি রহিমকে ৫০০০ টাকা দিয়েছি"
-or "Rahim ke 5000 dilam"',
+                                'Tap mic and say in Bangla or Banglish:\\n"আমি রহিমকে ৫০০০ টাকা দিয়েছি"\\nor "Rahim ke 5000 dilam"',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: Colors.grey.shade400, fontSize: 12, height: 1.4),
                               ),
@@ -1357,10 +1355,10 @@ class _ManagePeopleScreenState extends State<ManagePeopleScreen> {
                     title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                     subtitle: Text(
                       isZero
-                          ? 'Settled ($0)'
+                          ? r'Settled ($0)'
                           : owesMe
-                              ? 'Owes: ${currency.format(p.netBalance)}'
-                              : 'You owe: ${currency.format(p.netBalance.abs())}',
+                              ? 'Owes: \${currency.format(p.netBalance)}'
+                              : 'You owe: \${currency.format(p.netBalance.abs())}',
                       style: TextStyle(
                         fontSize: 12,
                         color: isZero ? Colors.grey : owesMe ? const Color(0xFF10B981) : const Color(0xFFF43F5E),
@@ -1377,7 +1375,7 @@ class _ManagePeopleScreenState extends State<ManagePeopleScreen> {
                                 builder: (_) => AlertDialog(
                                   backgroundColor: const Color(0xFF1E293B),
                                   title: const Text('Settle balance?'),
-                                  content: Text('Mark ${p.name}\'s balance as fully settled?'),
+                                  content: Text('Mark \${p.name}\\'s balance as fully settled?'),
                                   actions: [
                                     TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
                                     ElevatedButton(
@@ -1406,7 +1404,7 @@ class _ManagePeopleScreenState extends State<ManagePeopleScreen> {
                               builder: (_) => AlertDialog(
                                 backgroundColor: const Color(0xFF1E293B),
                                 title: const Text('Delete contact?'),
-                                content: Text('Delete ${p.name} and all their records?'),
+                                content: Text('Delete \${p.name} and all their records?'),
                                 actions: [
                                   TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
                                   ElevatedButton(
@@ -1517,14 +1515,14 @@ class VoiceListeningSheet extends StatelessWidget {
             child: Column(
               children: [
                 Text(
-                  provider.currentWords.isEmpty ? 'বলুন: "রহিমকে ৫০০০ টাকা দিয়েছি" / "Rahim ke 5000 dilam"' : '"${provider.currentWords}"',
+                  provider.currentWords.isEmpty ? 'বলুন: "রহিমকে ৫০০০ টাকা দিয়েছি" / "Rahim ke 5000 dilam"' : '"\${provider.currentWords}"',
                   style: TextStyle(fontSize: 15, fontStyle: provider.currentWords.isEmpty ? FontStyle.italic : FontStyle.normal, color: provider.currentWords.isEmpty ? Colors.grey : Colors.white),
                   textAlign: TextAlign.center,
                 ),
                 if (parseResult?.detectedLanguage != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text('Language: ${parseResult!.detectedLanguage}', style: const TextStyle(fontSize: 10, color: Color(0xFF38BDF8))),
+                    child: Text('Language: \${parseResult!.detectedLanguage}', style: const TextStyle(fontSize: 10, color: Color(0xFF38BDF8))),
                   ),
               ],
             ),
@@ -1536,7 +1534,7 @@ class VoiceListeningSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Text(
-                'Auto-corrected: ${parseResult.autoCorrections.join(', ')}',
+                'Auto-corrected: \${parseResult.autoCorrections.join(', ')}',
                 style: const TextStyle(fontSize: 11, color: Color(0xFF38BDF8)),
               ),
             ),
@@ -1558,7 +1556,7 @@ class VoiceListeningSheet extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(parseResult.type!.label.toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: parseResult.type!.color)),
-                        Text('${parseResult.personName} • \$${parseResult.amount?.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                        Text('\${parseResult.personName} • \\$\${parseResult.amount?.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                       ],
                     ),
                   ),
@@ -1576,12 +1574,12 @@ class VoiceListeningSheet extends StatelessWidget {
                     personName: parseResult.personName!,
                     amount: parseResult.amount!,
                     type: parseResult.type!,
-                    note: 'Voice: "${provider.currentWords}"',
+                    note: 'Voice: "\${provider.currentWords}"',
                   );
                   if (context.mounted) {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Logged ${parseResult.type!.label} to ${parseResult.personName}'), backgroundColor: const Color(0xFF10B981)),
+                      SnackBar(content: Text('Logged \${parseResult.type!.label} to \${parseResult.personName}'), backgroundColor: const Color(0xFF10B981)),
                     );
                   }
                 },
@@ -1796,7 +1794,7 @@ class _ManualEntryDialogState extends State<ManualEntryDialog> {
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Saved ${_nameController.text}: \$${amount.toStringAsFixed(0)}'), backgroundColor: const Color(0xFF10B981)),
+                  SnackBar(content: Text('Saved \${_nameController.text}: \\$\${amount.toStringAsFixed(0)}'), backgroundColor: const Color(0xFF10B981)),
                 );
               }
             }
@@ -1851,7 +1849,7 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
             child: Column(
               children: [
                 Text(
-                  isZero ? 'ALL SETTLED UP' : owesMe ? '${updated.name.toUpperCase()} OWES YOU' : 'YOU OWE ${updated.name.toUpperCase()}',
+                  isZero ? 'ALL SETTLED UP' : owesMe ? '\${updated.name.toUpperCase()} OWES YOU' : 'YOU OWE \${updated.name.toUpperCase()}',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: isZero ? Colors.grey : owesMe ? const Color(0xFF10B981) : const Color(0xFFF43F5E)),
                 ),
                 const SizedBox(height: 6),
@@ -1887,3 +1885,4 @@ class _PersonDetailScreenState extends State<PersonDetailScreen> {
     );
   }
 }
+`;
